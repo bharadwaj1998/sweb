@@ -1,0 +1,27 @@
+// Todo App example using SWeb language with database integration
+
+// Define a model for Todo items
+MODEL Todo {
+  title: TEXT;
+  completed: BOOLEAN = false;
+  priority: NUMBER = 1;
+  dueDate: DATE;
+}
+
+// Create a form to add new Todo items
+FORM TodoForm {
+  model: Todo;
+  fields: title, priority, dueDate;
+}
+
+// Create a list to display Todo items
+LIST TodoList {
+  model: Todo;
+  fields: title, completed, priority, dueDate;
+}
+
+// Create a page to hold the form and list
+PAGE TodoPage {
+  title: "Todo Manager";
+  components: TodoForm, TodoList;
+}

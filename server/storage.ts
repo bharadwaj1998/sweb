@@ -1,4 +1,6 @@
 import { swebApps, swebData, type SwebApp, type InsertSwebApp, type SwebData, type InsertSwebData } from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
   // SWeb App operations
@@ -17,6 +19,7 @@ export interface IStorage {
   deleteData(id: number): Promise<boolean>;
 }
 
+// Memory storage implementation for development
 export class MemStorage implements IStorage {
   private apps: Map<number, SwebApp>;
   private data: Map<number, SwebData>;
@@ -46,7 +49,9 @@ export class MemStorage implements IStorage {
   async createApp(app: InsertSwebApp): Promise<SwebApp> {
     const id = this.appIdCounter++;
     const createdAt = new Date();
-    const newApp = { ...app, id, createdAt };
+    // Ensure description is null if undefined
+    const description = app.description === undefined ? null : app.description;
+    const newApp = { ...app, description, id, createdAt };
     this.apps.set(id, newApp);
     return newApp;
   }
@@ -97,4 +102,85 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Database storage implementation for production
+export class DatabaseStorage implements IStorage {
+  // SWeb App operations
+  async getApps(): Promise<SwebApp[]> {
+    return await db.select().from(swebApps);
+  }
+
+  async getApp(id: number): Promise<SwebApp | undefined> {
+    const results = await db.select().from(swebApps).where(eq(swebApps.id, id));
+    return results.length > 0 ? results[0] : undefined;
+  }
+
+  async getAppByName(name: string): Promise<SwebApp | undefined> {
+    const results = await db.select().from(swebApps).where(eq(swebApps.name, name));
+    return results.length > 0 ? results[0] : undefined;
+  }
+
+  async createApp(app: InsertSwebApp): Promise<SwebApp> {
+    const inserted = await db.insert(swebApps).values(app).returning();
+    return inserted[0];
+  }
+
+  async updateApp(id: number, app: Partial<InsertSwebApp>): Promise<SwebApp | undefined> {
+    const updated = await db
+      .update(swebApps)
+      .set(app)
+      .where(eq(swebApps.id, id))
+      .returning();
+    return updated.length > 0 ? updated[0] : undefined;
+  }
+
+  async deleteApp(id: number): Promise<boolean> {
+    const deleted = await db
+      .delete(swebApps)
+      .where(eq(swebApps.id, id))
+      .returning();
+    return deleted.length > 0;
+  }
+
+  // SWeb Data operations
+  async getData(appId: number, modelName: string): Promise<SwebData[]> {
+    return await db
+      .select()
+      .from(swebData)
+      .where(
+        and(
+          eq(swebData.appId, appId),
+          eq(swebData.modelName, modelName)
+        )
+      );
+  }
+
+  async getDataById(id: number): Promise<SwebData | undefined> {
+    const results = await db.select().from(swebData).where(eq(swebData.id, id));
+    return results.length > 0 ? results[0] : undefined;
+  }
+
+  async createData(data: InsertSwebData): Promise<SwebData> {
+    const inserted = await db.insert(swebData).values(data).returning();
+    return inserted[0];
+  }
+
+  async updateData(id: number, data: Partial<InsertSwebData>): Promise<SwebData | undefined> {
+    const updated = await db
+      .update(swebData)
+      .set(data)
+      .where(eq(swebData.id, id))
+      .returning();
+    return updated.length > 0 ? updated[0] : undefined;
+  }
+
+  async deleteData(id: number): Promise<boolean> {
+    const deleted = await db
+      .delete(swebData)
+      .where(eq(swebData.id, id))
+      .returning();
+    return deleted.length > 0;
+  }
+}
+
+// Use DatabaseStorage for production environment
+export const storage = new DatabaseStorage();
